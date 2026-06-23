@@ -33,11 +33,14 @@ instead of committing the machine-local artifact.
 
 ```text
 .
+|-- keyboard/
 `-- monitors/
 ```
 
 What each area means:
 
+- `keyboard/`: portable keyboard input policy and shortcut snippets for
+  laptop-first setups.
 - `monitors/`: portable monitor layout policy and behavior notes for laptop and
   external-display setups.
 
