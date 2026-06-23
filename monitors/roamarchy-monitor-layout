@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WORKSPACE_LIMIT=${ROAMARCHY_WORKSPACE_LIMIT:-20}
+LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/roamarchy-monitor-layout.lock"
+
+hypr() {
+  hyprctl --quiet "$@"
+}
+
+active_monitors_json() {
+  hyprctl monitors -j
+}
+
+best_mode_for_monitor() {
+  local monitor_name=$1
+
+  hyprctl monitors all -j | jq -r --arg name "$monitor_name" '
+    .[]
+    | select(.name == $name)
+    | .availableModes[]
+    | capture("(?<width>[0-9]+)x(?<height>[0-9]+)@(?<refresh>[0-9.]+)Hz")
+    | {
+        mode: (.width + "x" + .height + "@" + .refresh),
+        area: ((.width | tonumber) * (.height | tonumber)),
+        refresh: (.refresh | tonumber)
+      }
+    | @base64
+  ' | while IFS= read -r encoded; do
+    printf '%s\n' "$encoded" | base64 --decode | jq -r '.'
+  done | jq -sr '
+    (sort_by(.area, .refresh) | last | .mode) // "preferred"
+  '
+}
+
+apply_workspace_rules() {
+  local external=$1
+  local internal=$2
+  local workspace monitor
+
+  for ((workspace = 1; workspace <= WORKSPACE_LIMIT; workspace++)); do
+    if ((workspace % 2 == 1)); then
+      monitor=$external
+    else
+      monitor=$internal
+    fi
+
+    hypr keyword workspace "${workspace}, monitor:${monitor}, persistent:false"
+    hypr dispatch moveworkspacetomonitor "${workspace} ${monitor}" || true
+  done
+}
+
+apply_layout_once() {
+  local monitors internal external internal_mode external_mode external_width
+
+  monitors=$(active_monitors_json)
+  internal=$(jq -r '[.[] | select(.name | test("^eDP")) | .name][0] // empty' <<<"$monitors")
+
+  if [[ -z "$internal" ]]; then
+    return 0
+  fi
+
+  external=$(
+    jq -r --arg internal "$internal" '
+      [.[] | select(.name != $internal) | .name][0] // empty
+    ' <<<"$monitors"
+  )
+
+  if [[ -z "$external" ]]; then
+    internal_mode=$(best_mode_for_monitor "$internal")
+    hypr keyword monitor "${internal},${internal_mode},auto,1"
+    hypr dispatch moveworkspacetomonitor "1 ${internal}" || true
+    hypr dispatch workspace 1 || true
+    return 0
+  fi
+
+  internal_mode=$(best_mode_for_monitor "$internal")
+  external_mode=$(best_mode_for_monitor "$external")
+  external_width=${external_mode%%x*}
+
+  hypr keyword monitor "${external},${external_mode},0x0,1"
+  hypr keyword monitor "${internal},${internal_mode},${external_width}x0,1"
+  apply_workspace_rules "$external" "$internal"
+  hypr dispatch workspace 1 || true
+}
+
+watch_monitor_events() {
+  local socket
+  socket="${XDG_RUNTIME_DIR}/hypr/${HYPRLAND_INSTANCE_SIGNATURE}/.socket2.sock"
+
+  apply_layout_once
+
+  socat -U - "UNIX-CONNECT:${socket}" | while IFS= read -r event; do
+    case "$event" in
+      monitoradded\>\>*|monitoraddedv2\>\>*|monitorremoved\>\>*|monitorremovedv2\>\>*|configreloaded\>\>*)
+        sleep 1
+        apply_layout_once
+        ;;
+    esac
+  done
+}
+
+main() {
+  local command=${1:-apply}
+
+  (
+    flock -n 9 || exit 0
+
+    case "$command" in
+      apply) apply_layout_once ;;
+      watch) watch_monitor_events ;;
+      *)
+        echo "Usage: $(basename "$0") [apply|watch]" >&2
+        exit 2
+        ;;
+    esac
+  ) 9>"$LOCK_FILE"
+}
+
+main "$@"
