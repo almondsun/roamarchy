@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+AC_PROFILE="${ROAMARCHY_AC_PROFILE:-performance}"
+BATTERY_PROFILE="${ROAMARCHY_BATTERY_PROFILE:-balanced}"
+DEFAULT_HOME="${HOME:-/root}"
+STATE_DIR="${XDG_STATE_HOME:-$DEFAULT_HOME/.local/state}/roamarchy"
+STATE_FILE="$STATE_DIR/power-profile"
+POWER_SUPPLY_ROOT="${ROAMARCHY_POWER_SUPPLY_ROOT:-/sys/class/power_supply}"
+CPUFREQ_ROOT="${ROAMARCHY_CPUFREQ_ROOT:-/sys/devices/system/cpu/cpufreq}"
+
+available_profiles() {
+  powerprofilesctl list 2>/dev/null |
+    awk -F: '/^[*[:space:]]*[[:alnum:]_-]+:/ {
+      gsub(/^[*[:space:]]+|[[:space:]]+$/, "", $1)
+      print $1
+    }'
+}
+
+profile_available() {
+  available_profiles | grep -Fxq "$1"
+}
+
+set_power_profile() {
+  local profile="$1"
+  local current
+
+  profile_available "$profile" || return 1
+
+  current="$(powerprofilesctl get 2>/dev/null || true)"
+  if [[ "$current" != "$profile" ]]; then
+    powerprofilesctl set "$profile"
+  fi
+}
+
+is_ac_online() {
+  local supply type online
+
+  for supply in "$POWER_SUPPLY_ROOT"/*; do
+    [[ -r "$supply/type" ]] || continue
+    type="$(<"$supply/type")"
+
+    case "$type" in
+      Mains|USB|USB_C|USB_PD)
+        [[ -r "$supply/online" ]] || continue
+        online="$(<"$supply/online")"
+        [[ "$online" == "1" ]] && return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+governor_files() {
+  find "$CPUFREQ_ROOT" -maxdepth 2 -name scaling_governor -print 2>/dev/null
+}
+
+governor_available_for_file() {
+  local governor="$1"
+  local governor_file="$2"
+  local available_file="${governor_file%/scaling_governor}/scaling_available_governors"
+
+  [[ -r "$available_file" ]] || return 1
+  grep -qw "$governor" "$available_file"
+}
+
+pick_balanced_governor() {
+  local governor_file="$1"
+  local candidate
+
+  for candidate in schedutil ondemand conservative powersave; do
+    if governor_available_for_file "$candidate" "$governor_file"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+set_cpu_governor() {
+  local requested="$1"
+  local governor_file governor target
+  local seen=0
+
+  while IFS= read -r governor_file; do
+    seen=1
+    [[ -w "$governor_file" ]] || return 1
+
+    if [[ "$requested" == "balanced" ]]; then
+      target="$(pick_balanced_governor "$governor_file")" || return 1
+    else
+      target="$requested"
+      governor_available_for_file "$target" "$governor_file" || return 1
+    fi
+
+    governor="$(<"$governor_file")"
+    if [[ "$governor" != "$target" ]]; then
+      printf '%s\n' "$target" >"$governor_file"
+    fi
+  done < <(governor_files)
+
+  (( seen ))
+  return 0
+}
+
+record_state() {
+  local state="$1"
+  local previous=""
+
+  mkdir -p "$STATE_DIR"
+  [[ -r "$STATE_FILE" ]] && previous="$(<"$STATE_FILE")"
+
+  if [[ "$previous" != "$state" ]]; then
+    printf '%s\n' "$state" >"$STATE_FILE"
+    printf '%s\n' "$state"
+  fi
+}
+
+main() {
+  local source desired state profile_ok=0 governor_ok=0
+
+  if is_ac_online; then
+    source="ac"
+    desired="$AC_PROFILE"
+  else
+    source="battery"
+    desired="$BATTERY_PROFILE"
+  fi
+
+  if set_power_profile "$desired"; then
+    profile_ok=1
+  fi
+
+  if set_cpu_governor "$desired"; then
+    governor_ok=1
+  fi
+
+  if (( profile_ok && governor_ok )); then
+    record_state "$source: powerprofilesctl=$desired; cpufreq-governor=$desired"
+    return 0
+  fi
+
+  if (( governor_ok )); then
+    record_state "$source: cpufreq-governor=$desired"
+    return 0
+  fi
+
+  if (( profile_ok )); then
+    record_state "$source: powerprofilesctl=$desired"
+    return 0
+  fi
+
+  if [[ "$desired" == "performance" ]] && set_power_profile "$BATTERY_PROFILE"; then
+    state="$source: requested=performance unavailable; powerprofilesctl=$BATTERY_PROFILE"
+    record_state "$state"
+    return 0
+  fi
+
+  printf 'Unable to apply requested power policy for %s: %s\n' "$source" "$desired" >&2
+  return 1
+}
+
+main "$@"

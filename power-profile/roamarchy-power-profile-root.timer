@@ -1,0 +1,11 @@
+[Unit]
+Description=Roamarchy Root Power Profile Policy Timer
+Requires=roamarchy-power-profile-root.service
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

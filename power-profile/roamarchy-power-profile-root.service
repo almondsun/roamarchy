@@ -1,0 +1,8 @@
+[Unit]
+Description=Roamarchy Root Power Profile Policy
+After=multi-user.target power-profiles-daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/roamarchy-power-profile
+LogLevelMax=notice
