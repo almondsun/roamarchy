@@ -1,0 +1,14 @@
+{
+  "logo": {
+    "type": "kitty-icat",
+    "source": "~/.config/roamarchy/terminal/tux.gif",
+    "width": 38,
+    "height": 16,
+    "preserveAspectRatio": true,
+    "padding": {
+      "top": 6,
+      "right": 6,
+      "left": 2
+    }
+  }
+}

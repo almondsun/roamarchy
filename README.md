@@ -34,7 +34,8 @@ instead of committing the machine-local artifact.
 ```text
 .
 |-- keyboard/
-`-- monitors/
+|-- monitors/
+`-- terminal/
 ```
 
 What each area means:
@@ -43,6 +44,8 @@ What each area means:
   laptop-first setups.
 - `monitors/`: portable monitor layout policy and behavior notes for laptop and
   external-display setups.
+- `terminal/`: portable Kitty, Fish, Starship, and fastfetch policy for the
+  default terminal experience.
 
 ## Migration intent
 
