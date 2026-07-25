@@ -13,6 +13,7 @@ When an external monitor is connected:
 
 - make the external monitor the primary monitor, so `Super+1` targets that
   display
+- place the external monitor to the left of the laptop panel
 - assign odd-numbered workspaces (`1`, `3`, `2n+1`) to the external monitor
 - assign even-numbered workspaces (`2`, `4`, `2n`) to the laptop monitor
 - select the maximum supported resolution and refresh rate detected for each
@@ -28,20 +29,26 @@ authoritative configuration unless they are intentionally generalized.
 
 ## Current implementation
 
-The live machine runs `~/.local/bin/roamarchy-monitor-layout watch` from
-`~/.config/hypr/autostart.conf`.
+Quattro's own `omarchy-hyprland-monitor-watch` continues to own clamshell and
+monitor-toggle recovery. This policy adds only layout and workspace placement:
 
-The durable copy is `monitors/roamarchy-monitor-layout`. It detects the internal
-`eDP*` display, treats the first active non-internal display as external, applies
-the highest available mode by pixel area and refresh rate, and assigns
-both displays to scale `1`. It assigns workspaces `1` through `20` by odd/even
-parity. Set
+- `monitors/monitors.lua` establishes the portable preferred-mode, scale-1
+  baseline
+- `~/.local/bin/roamarchy-monitor-layout watch` applies the dynamic policy
+- `monitors/autostart.lua` starts that watcher from
+  `~/.config/hypr/autostart.lua`
+
+The watcher detects the internal `eDP*` display, treats the first active
+non-internal display as external, applies the highest available mode by pixel
+area and refresh rate, and assigns both displays to scale `1`. It assigns
+workspaces `1` through `20` by odd/even parity. When the external display is
+removed, all managed workspaces are reassigned to the internal panel. Set
 `ROAMARCHY_WORKSPACE_LIMIT` before launch if a machine needs a wider workspace
 range.
 
 ## Install on a machine
 
-Review the target machine's existing Hyprland monitor and autostart
+Review the target machine's existing Quattro Hyprland monitor and autostart
 configuration before installing this policy.
 
 Install the durable script into the user runtime path:
@@ -50,10 +57,13 @@ Install the durable script into the user runtime path:
 install -m 755 monitors/roamarchy-monitor-layout ~/.local/bin/roamarchy-monitor-layout
 ```
 
-Add this user-managed autostart line to `~/.config/hypr/autostart.conf`:
+Merge `monitors/monitors.lua` into `~/.config/hypr/monitors.lua`.
 
-```conf
-exec-once = uwsm-app -- ~/.local/bin/roamarchy-monitor-layout watch
+Merge this line from `monitors/autostart.lua` into
+`~/.config/hypr/autostart.lua`:
+
+```lua
+o.launch_on_start(os.getenv("HOME") .. "/.local/bin/roamarchy-monitor-layout watch")
 ```
 
 Apply once in the current Hyprland session:
@@ -68,8 +78,10 @@ Validate after installation:
 bash -n ~/.local/bin/roamarchy-monitor-layout
 hyprctl monitors
 hyprctl workspacerules
+hyprctl reload
 hyprctl configerrors
 ```
 
 `hyprctl configerrors` should not report any errors. The active monitor output
-should show scale `1` on managed displays.
+should show scale `1` on managed displays. Quattro's own monitor watcher should
+remain enabled; this policy does not replace it.

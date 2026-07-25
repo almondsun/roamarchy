@@ -18,42 +18,45 @@ configuration.
 
 ## Current implementation
 
-The live machine applies the input policy in `~/.config/hypr/input.conf` by
-setting:
+Quattro loads personal Hyprland overrides from Lua modules after the Omarchy
+defaults. The input policy belongs in `~/.config/hypr/input.lua`:
 
-```conf
-input {
-  kb_layout = latam
-  kb_options =
-}
+```lua
+hl.config({
+  input = {
+    kb_layout = "latam",
+    kb_options = "",
+  },
+})
 ```
 
-The live machine applies the screenshot shortcut in
-`~/.config/hypr/bindings.conf`:
+Quattro assigns `Super+Shift+S` to Google Maps by default. The screenshot
+override in `~/.config/hypr/bindings.lua` must therefore unbind it first:
 
-```conf
-bindd = SUPER SHIFT, S, Screenshot, exec, omarchy-capture-screenshot
+```lua
+hl.unbind("SUPER + SHIFT + S")
+o.bind("SUPER + SHIFT + S", "Screenshot", "omarchy-capture-screenshot")
 ```
 
 The durable snippets are:
 
-- `keyboard/input.conf`
-- `keyboard/bindings.conf`
+- `keyboard/input.lua`
+- `keyboard/bindings.lua`
 
 ## Install on a machine
 
 Review the target machine's existing Hyprland input and binding configuration
 before installing this policy.
 
-Merge the durable input snippet into `~/.config/hypr/input.conf`, preserving any
+Merge the durable input snippet into `~/.config/hypr/input.lua`, preserving any
 target-machine layout choice if it should not be `latam`. The important setting
 for normal CapsLock behavior is:
 
-```conf
-kb_options =
+```lua
+kb_options = ""
 ```
 
-Merge the durable binding snippet into `~/.config/hypr/bindings.conf`. Check
+Merge the durable binding snippet into `~/.config/hypr/bindings.lua`. Check
 first that `Super+Shift+S` is not already used:
 
 ```bash
@@ -69,4 +72,4 @@ omarchy menu keybindings --print
 ```
 
 `hyprctl configerrors` should not report any errors, and the keybinding list
-should include `SUPER SHIFT + S` for screenshots.
+should include `SUPER + SHIFT + S` for screenshots instead of Google Maps.
