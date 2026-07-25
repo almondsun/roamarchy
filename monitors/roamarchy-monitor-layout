@@ -2,10 +2,15 @@
 set -euo pipefail
 
 WORKSPACE_LIMIT=${ROAMARCHY_WORKSPACE_LIMIT:-20}
-LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/roamarchy-monitor-layout.lock"
+RUNTIME_DIR=${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR must be set in the desktop session}
+LOCK_FILE="$RUNTIME_DIR/roamarchy-monitor-layout.lock"
 
-hypr() {
-  hyprctl --quiet "$@"
+hypr_eval() {
+  hyprctl --quiet eval "$1"
+}
+
+validate_monitor_name() {
+  [[ $1 =~ ^[[:alnum:]_.:-]+$ ]]
 }
 
 active_monitors_json() {
@@ -25,19 +30,22 @@ best_mode_for_monitor() {
         area: ((.width | tonumber) * (.height | tonumber)),
         refresh: (.refresh | tonumber)
       }
-    | @base64
-  ' | while IFS= read -r encoded; do
-    printf '%s\n' "$encoded" | base64 --decode | jq -r '.'
-  done | jq -sr '
+  ' | jq -sr '
     (sort_by(.area, .refresh) | last | .mode) // "preferred"
   '
 }
 
-apply_workspace_rules() {
+set_workspace_rules() {
   local external=$1
   local internal=$2
-  local workspace monitor
+  local workspace monitor signature code
 
+  validate_monitor_name "$external"
+  validate_monitor_name "$internal"
+
+  signature="split:${external}:${internal}:${WORKSPACE_LIMIT}"
+  code='if _G.roamarchy_workspace_rules then for _, rule in ipairs(_G.roamarchy_workspace_rules) do rule:set_enabled(false) end end; _G.roamarchy_workspace_rule_sets = _G.roamarchy_workspace_rule_sets or {}; for _, rule_set in pairs(_G.roamarchy_workspace_rule_sets) do for _, rule in ipairs(rule_set) do rule:set_enabled(false) end end;'
+  code+="local signature = \"${signature}\"; local rules = _G.roamarchy_workspace_rule_sets[signature]; if not rules then rules = {};"
   for ((workspace = 1; workspace <= WORKSPACE_LIMIT; workspace++)); do
     if ((workspace % 2 == 1)); then
       monitor=$external
@@ -45,9 +53,54 @@ apply_workspace_rules() {
       monitor=$internal
     fi
 
-    hypr keyword workspace "${workspace}, monitor:${monitor}, persistent:false"
-    hypr dispatch moveworkspacetomonitor "${workspace} ${monitor}" || true
+    code+="table.insert(rules, hl.workspace_rule({ workspace = \"${workspace}\", monitor = \"${monitor}\", persistent = false }));"
   done
+
+  code+=' _G.roamarchy_workspace_rule_sets[signature] = rules; else for _, rule in ipairs(rules) do rule:set_enabled(true) end end; _G.roamarchy_workspace_rules = rules'
+  hypr_eval "$code"
+}
+
+set_single_monitor_workspace_rules() {
+  local internal=$1
+  local workspace signature code
+
+  validate_monitor_name "$internal"
+
+  signature="single:${internal}:${WORKSPACE_LIMIT}"
+  code='if _G.roamarchy_workspace_rules then for _, rule in ipairs(_G.roamarchy_workspace_rules) do rule:set_enabled(false) end end; _G.roamarchy_workspace_rule_sets = _G.roamarchy_workspace_rule_sets or {}; for _, rule_set in pairs(_G.roamarchy_workspace_rule_sets) do for _, rule in ipairs(rule_set) do rule:set_enabled(false) end end;'
+  code+="local signature = \"${signature}\"; local rules = _G.roamarchy_workspace_rule_sets[signature]; if not rules then rules = {};"
+  for ((workspace = 1; workspace <= WORKSPACE_LIMIT; workspace++)); do
+    code+="table.insert(rules, hl.workspace_rule({ workspace = \"${workspace}\", monitor = \"${internal}\", persistent = false }));"
+  done
+
+  code+=' _G.roamarchy_workspace_rule_sets[signature] = rules; else for _, rule in ipairs(rules) do rule:set_enabled(true) end end; _G.roamarchy_workspace_rules = rules'
+  hypr_eval "$code"
+}
+
+move_existing_workspaces() {
+  local external=$1
+  local internal=$2
+  local workspace current_monitor target_monitor
+
+  while IFS=$'\t' read -r workspace current_monitor; do
+    if [[ "$external" == "$internal" ]] || ((workspace % 2 == 0)); then
+      target_monitor=$internal
+    else
+      target_monitor=$external
+    fi
+
+    if [[ "$current_monitor" != "$target_monitor" ]]; then
+      hypr_eval "hl.dispatch(hl.dsp.focus({ workspace = \"${workspace}\" })); hl.dispatch(hl.dsp.workspace.move({ monitor = \"${target_monitor}\" }))"
+    fi
+  done < <(
+    hyprctl workspaces -j |
+      jq -r --argjson limit "$WORKSPACE_LIMIT" '
+        .[]
+        | select(.id >= 1 and .id <= $limit)
+        | [.id, .monitor]
+        | @tsv
+      '
+  )
 }
 
 apply_layout_once() {
@@ -68,9 +121,11 @@ apply_layout_once() {
 
   if [[ -z "$external" ]]; then
     internal_mode=$(best_mode_for_monitor "$internal")
-    hypr keyword monitor "${internal},${internal_mode},auto,1"
-    hypr dispatch moveworkspacetomonitor "1 ${internal}" || true
-    hypr dispatch workspace 1 || true
+    validate_monitor_name "$internal"
+    hypr_eval "hl.monitor({ output = \"${internal}\", mode = \"${internal_mode}\", position = \"auto\", scale = 1 })"
+    set_single_monitor_workspace_rules "$internal"
+    move_existing_workspaces "$internal" "$internal"
+    hypr_eval 'hl.dispatch(hl.dsp.focus({ workspace = "1" }))'
     return 0
   fi
 
@@ -78,15 +133,18 @@ apply_layout_once() {
   external_mode=$(best_mode_for_monitor "$external")
   external_width=${external_mode%%x*}
 
-  hypr keyword monitor "${external},${external_mode},0x0,1"
-  hypr keyword monitor "${internal},${internal_mode},${external_width}x0,1"
-  apply_workspace_rules "$external" "$internal"
-  hypr dispatch workspace 1 || true
+  validate_monitor_name "$internal"
+  validate_monitor_name "$external"
+  hypr_eval "hl.monitor({ output = \"${external}\", mode = \"${external_mode}\", position = \"0x0\", scale = 1 })"
+  hypr_eval "hl.monitor({ output = \"${internal}\", mode = \"${internal_mode}\", position = \"${external_width}x0\", scale = 1 })"
+  set_workspace_rules "$external" "$internal"
+  move_existing_workspaces "$external" "$internal"
+  hypr_eval 'hl.dispatch(hl.dsp.focus({ workspace = "1" }))'
 }
 
 watch_monitor_events() {
   local socket
-  socket="${XDG_RUNTIME_DIR}/hypr/${HYPRLAND_INSTANCE_SIGNATURE}/.socket2.sock"
+  socket="${RUNTIME_DIR}/hypr/${HYPRLAND_INSTANCE_SIGNATURE:?HYPRLAND_INSTANCE_SIGNATURE must be set}/.socket2.sock"
 
   apply_layout_once
 

@@ -20,12 +20,15 @@ choice, startup fastfetch behavior, and the portable `tux.gif` asset. Shell
 history, terminal scrollback, runtime caches, and machine-specific session state
 belong to the target machine and should not be committed.
 
-## Current implementation
+## Quattro implementation
 
-The live machine applies this policy through:
+This policy uses Quattro's public terminal command plus user-owned configuration:
 
-- `~/.config/xdg-terminals.list`: keeps `kitty.desktop` first
-- `~/.config/kitty/kitty.conf`: launches `fish`
+- `omarchy install terminal kitty`: installs Kitty and makes it the default for
+  `xdg-terminal-exec`
+- `~/.config/kitty/kitty.conf`: launches `fish`, imports the Quattro theme from
+  `~/.local/state/omarchy/current/`, and preserves Quattro's enhanced Enter-key
+  and cwd lookup support
 - `~/.config/fish/config.fish`: initializes Starship and prints fastfetch once
   per interactive Kitty session with `--logo-recache true`
 - `~/.config/starship.toml`: Starship `pastel-powerline` preset structure with
@@ -46,6 +49,13 @@ The durable repo copies are:
 Review the target machine's terminal, shell, prompt, and fastfetch config before
 installing this policy.
 
+Install the required terminal and tools through Quattro:
+
+```bash
+omarchy install terminal kitty
+omarchy pkg add fish starship fastfetch
+```
+
 Install the durable files:
 
 ```bash
@@ -56,12 +66,6 @@ install -m 644 terminal/starship.toml ~/.config/starship.toml
 install -m 644 terminal/tux.gif ~/.config/roamarchy/terminal/tux.gif
 ```
 
-Keep Kitty first for `xdg-terminal-exec`:
-
-```text
-kitty.desktop
-```
-
 Merge the logo block from `terminal/fastfetch-logo.jsonc` into
 `~/.config/fastfetch/config.jsonc`, preserving the rest of the machine's
 fastfetch module list unless the full display layout should also be replaced.
@@ -70,7 +74,7 @@ Validate after installation:
 
 ```bash
 fish --no-execute ~/.config/fish/config.fish
-starship explain
+STARSHIP_CONFIG=~/.config/starship.toml starship explain
 file ~/.config/roamarchy/terminal/tux.gif
 xdg-terminal-exec -- true
 ```
