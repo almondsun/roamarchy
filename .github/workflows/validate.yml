@@ -49,5 +49,6 @@ jobs:
         env:
           OMARCHY_PATH: ${{ github.workspace }}/.ci/omarchy
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           export PATH="$OMARCHY_PATH/bin:/usr/lib/qt6/bin:$PATH"
           scripts/check
