@@ -57,8 +57,26 @@ file modules/terminal/files/.config/roamarchy/terminal/tux.gif |
 printf '%s\n' 'Check Omarchy shell plugin'
 omarchy plugin validate \
   modules/proton-vpn/files/.config/omarchy/plugins/local.proton-vpn
-qmllint -I "${OMARCHY_PATH:-/usr/share/omarchy}/shell" \
+
+qml_import_root=$(mktemp -d)
+trap 'rm -rf "$qml_import_root"' EXIT
+ln -s "${OMARCHY_PATH:-/usr/share/omarchy}/shell" "$qml_import_root/qs"
+
+qml_linter=$(command -v qmllint)
+if [[ -x /usr/lib/qt6/bin/qmllint ]]; then
+  qml_linter=/usr/lib/qt6/bin/qmllint
+fi
+
+# Quickshell's generated qmltypes reference QProcess::ExitStatus without
+# importing that C++ enum. Ignore only that metadata limitation; every other
+# warning is still fatal.
+"$qml_linter" \
+  --signal-handler-parameters disable \
+  --max-warnings 0 \
+  -I "$qml_import_root" \
   modules/proton-vpn/files/.config/omarchy/plugins/local.proton-vpn/Widget.qml
+rm -rf "$qml_import_root"
+trap - EXIT
 
 printf '%s\n' 'Check monitor-layout behavior'
 bats tests/monitor-layout.bats

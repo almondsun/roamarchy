@@ -20,20 +20,24 @@ jobs:
 
     steps:
       - name: Install validation dependencies
-        run: >-
-          pacman -Syu --noconfirm --needed
-          bats
-          file
-          fish
-          git
-          jq
-          qt6-declarative
-          quickshell
-          ripgrep
-          shellcheck
-          shfmt
-          starship
-          stylua
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+          systemd-machine-id-setup
+          pacman -Syu --noconfirm --needed \
+            bats \
+            file \
+            fish \
+            git \
+            jq \
+            qt6-declarative \
+            quickshell \
+            ripgrep \
+            shellcheck \
+            shfmt \
+            starship \
+            stylua
+          git config --global init.defaultBranch quattro
 
       - name: Check out Roamarchy
         uses: actions/checkout@v5
