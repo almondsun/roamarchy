@@ -57,12 +57,13 @@ session:
 ```
 
 Set `ROAMARCHY_WORKSPACE_LIMIT` in the launch environment before the watcher
-starts if more than the default 20 managed workspaces are required.
+starts if more than the default 20 managed workspaces are required. The value
+must be a positive integer.
 
 ## Validate
 
 ```bash
-bash -n modules/monitor-layout/files/.local/bin/roamarchy-monitor-layout
+scripts/check
 hyprctl reload
 hyprctl configerrors
 hyprctl monitors

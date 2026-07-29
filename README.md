@@ -22,6 +22,9 @@ out of scope.
 4. Follow each module's preflight, installation, validation, and rollback
    instructions.
 
+Repository changes use the canonical workflow documented in
+[Development](docs/development.md).
+
 There is deliberately no automatic installer. Blindly copying desktop
 configuration is unsafe while Quattro is evolving; Roamarchy instead provides
 destination-mapped files, mergeable snippets, and exact manual commands.
@@ -61,4 +64,8 @@ the fragment must be merged rather than copied over the target file.
 After every Omarchy update, use the review process in
 [Maintenance](docs/maintenance.md). Update the tested version and module review
 record only after the relevant official interfaces and local validations have
-been checked again.
+been checked again. Before publishing any repository change, run:
+
+```bash
+scripts/check
+```

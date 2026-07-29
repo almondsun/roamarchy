@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-} ${2:-}" in
+  'monitors -j')
+    cat "$MOCK_ACTIVE_MONITORS"
+    ;;
+  'monitors all')
+    [[ ${3:-} == -j ]]
+    cat "$MOCK_ALL_MONITORS"
+    ;;
+  'workspaces -j')
+    cat "$MOCK_WORKSPACES"
+    ;;
+  '--quiet eval')
+    printf '%s\n' "${3:-}" >>"$MOCK_EVAL_LOG"
+    ;;
+  *)
+    printf 'Unexpected hyprctl arguments: %q' "$1" >&2
+    printf ' %q' "${@:2}" >&2
+    printf '\n' >&2
+    exit 64
+    ;;
+esac

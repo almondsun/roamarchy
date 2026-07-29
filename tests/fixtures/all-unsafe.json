@@ -1,0 +1,14 @@
+[
+  {
+    "name": "eDP-1",
+    "availableModes": [
+      "1920x1080@60.00Hz"
+    ]
+  },
+  {
+    "name": "HDMI-A-1\";os.execute",
+    "availableModes": [
+      "2560x1440@60.00Hz"
+    ]
+  }
+]

@@ -1,0 +1,53 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - quattro
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+    container: archlinux:base
+
+    steps:
+      - name: Install validation dependencies
+        run: >-
+          pacman -Syu --noconfirm --needed
+          bats
+          file
+          fish
+          git
+          jq
+          qt6-declarative
+          quickshell
+          ripgrep
+          shellcheck
+          shfmt
+          starship
+          stylua
+
+      - name: Check out Roamarchy
+        uses: actions/checkout@v4
+
+      - name: Check out tested Omarchy contract
+        uses: actions/checkout@v4
+        with:
+          repository: basecamp/omarchy
+          ref: 9174fbf8515f4c057c91071ec39af731602adb92
+          path: .ci/omarchy
+
+      - name: Validate repository
+        env:
+          OMARCHY_PATH: ${{ github.workspace }}/.ci/omarchy
+        run: |
+          export PATH="$OMARCHY_PATH/bin:$PATH"
+          scripts/check

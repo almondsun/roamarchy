@@ -55,7 +55,8 @@ When Omarchy behavior changes, update both the affected module and
 ## Validation
 
 Use the smallest relevant syntax and runtime checks for each changed module.
-Always run `git diff --check`, verify documentation paths, and scan for secrets
-and stale paths. Hyprland changes require `hyprctl reload` followed by
-`hyprctl configerrors`; Omarchy shell plugin changes require native plugin
-validation and a shell rescan/restart on a test system.
+Run `scripts/check` for every repository change; it owns the canonical static,
+formatting, behavioral, documentation-path, private-path, and diff checks.
+Hyprland changes additionally require `hyprctl reload` followed by
+`hyprctl configerrors`; Omarchy shell plugin changes additionally require a
+shell rescan/restart and interactive validation on a test system.

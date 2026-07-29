@@ -13,6 +13,13 @@ validate_monitor_name() {
   [[ $1 =~ ^[[:alnum:]_.:-]+$ ]]
 }
 
+validate_workspace_limit() {
+  if [[ ! $WORKSPACE_LIMIT =~ ^[1-9][0-9]*$ ]]; then
+    echo "ROAMARCHY_WORKSPACE_LIMIT must be a positive integer" >&2
+    exit 2
+  fi
+}
+
 active_monitors_json() {
   hyprctl monitors -j
 }
@@ -38,42 +45,68 @@ best_mode_for_monitor() {
 set_workspace_rules() {
   local external=$1
   local internal=$2
+  local topology=split
   local workspace monitor signature code
+  local -a code_parts
 
   validate_monitor_name "$external"
   validate_monitor_name "$internal"
 
-  signature="split:${external}:${internal}:${WORKSPACE_LIMIT}"
-  code='if _G.roamarchy_workspace_rules then for _, rule in ipairs(_G.roamarchy_workspace_rules) do rule:set_enabled(false) end end; _G.roamarchy_workspace_rule_sets = _G.roamarchy_workspace_rule_sets or {}; for _, rule_set in pairs(_G.roamarchy_workspace_rule_sets) do for _, rule in ipairs(rule_set) do rule:set_enabled(false) end end;'
-  code+="local signature = \"${signature}\"; local rules = _G.roamarchy_workspace_rule_sets[signature]; if not rules then rules = {};"
+  if [[ $external == "$internal" ]]; then
+    topology=single
+  fi
+
+  signature="${topology}:${external}"
+  if [[ $topology == split ]]; then
+    signature+=":${internal}"
+  fi
+  signature+=":${WORKSPACE_LIMIT}"
+
+  code_parts=(
+    'if _G.roamarchy_workspace_rules then '
+    'for _, rule in ipairs(_G.roamarchy_workspace_rules) do '
+    'rule:set_enabled(false) '
+    'end '
+    'end; '
+    '_G.roamarchy_workspace_rule_sets = _G.roamarchy_workspace_rule_sets or {}; '
+    'for _, rule_set in pairs(_G.roamarchy_workspace_rule_sets) do '
+    'for _, rule in ipairs(rule_set) do '
+    'rule:set_enabled(false) '
+    'end '
+    'end; '
+    "local signature = \"${signature}\"; "
+    'local rules = _G.roamarchy_workspace_rule_sets[signature]; '
+    'if not rules then '
+    'rules = {}; '
+  )
+
   for ((workspace = 1; workspace <= WORKSPACE_LIMIT; workspace++)); do
-    if ((workspace % 2 == 1)); then
-      monitor=$external
-    else
+    if [[ $topology == single ]] || ((workspace % 2 == 0)); then
       monitor=$internal
+    else
+      monitor=$external
     fi
 
-    code+="table.insert(rules, hl.workspace_rule({ workspace = \"${workspace}\", monitor = \"${monitor}\", persistent = false }));"
+    code_parts+=(
+      "table.insert(rules, hl.workspace_rule({ "
+      "workspace = \"${workspace}\", "
+      "monitor = \"${monitor}\", "
+      'persistent = false '
+      '})); '
+    )
   done
 
-  code+=' _G.roamarchy_workspace_rule_sets[signature] = rules; else for _, rule in ipairs(rules) do rule:set_enabled(true) end end; _G.roamarchy_workspace_rules = rules'
-  hypr_eval "$code"
-}
+  code_parts+=(
+    '_G.roamarchy_workspace_rule_sets[signature] = rules; '
+    'else '
+    'for _, rule in ipairs(rules) do '
+    'rule:set_enabled(true) '
+    'end '
+    'end; '
+    '_G.roamarchy_workspace_rules = rules'
+  )
 
-set_single_monitor_workspace_rules() {
-  local internal=$1
-  local workspace signature code
-
-  validate_monitor_name "$internal"
-
-  signature="single:${internal}:${WORKSPACE_LIMIT}"
-  code='if _G.roamarchy_workspace_rules then for _, rule in ipairs(_G.roamarchy_workspace_rules) do rule:set_enabled(false) end end; _G.roamarchy_workspace_rule_sets = _G.roamarchy_workspace_rule_sets or {}; for _, rule_set in pairs(_G.roamarchy_workspace_rule_sets) do for _, rule in ipairs(rule_set) do rule:set_enabled(false) end end;'
-  code+="local signature = \"${signature}\"; local rules = _G.roamarchy_workspace_rule_sets[signature]; if not rules then rules = {};"
-  for ((workspace = 1; workspace <= WORKSPACE_LIMIT; workspace++)); do
-    code+="table.insert(rules, hl.workspace_rule({ workspace = \"${workspace}\", monitor = \"${internal}\", persistent = false }));"
-  done
-
-  code+=' _G.roamarchy_workspace_rule_sets[signature] = rules; else for _, rule in ipairs(rules) do rule:set_enabled(true) end end; _G.roamarchy_workspace_rules = rules'
+  printf -v code '%s' "${code_parts[@]}"
   hypr_eval "$code"
 }
 
@@ -123,7 +156,7 @@ apply_layout_once() {
     internal_mode=$(best_mode_for_monitor "$internal")
     validate_monitor_name "$internal"
     hypr_eval "hl.monitor({ output = \"${internal}\", mode = \"${internal_mode}\", position = \"auto\", scale = 1 })"
-    set_single_monitor_workspace_rules "$internal"
+    set_workspace_rules "$internal" "$internal"
     move_existing_workspaces "$internal" "$internal"
     hypr_eval 'hl.dispatch(hl.dsp.focus({ workspace = "1" }))'
     return 0
@@ -150,7 +183,7 @@ watch_monitor_events() {
 
   socat -U - "UNIX-CONNECT:${socket}" | while IFS= read -r event; do
     case "$event" in
-      monitoradded\>\>*|monitoraddedv2\>\>*|monitorremoved\>\>*|monitorremovedv2\>\>*|configreloaded\>\>*)
+      monitoradded\>\>* | monitoraddedv2\>\>* | monitorremoved\>\>* | monitorremovedv2\>\>* | configreloaded\>\>*)
         sleep 1
         apply_layout_once
         ;;
@@ -160,6 +193,8 @@ watch_monitor_events() {
 
 main() {
   local command=${1:-apply}
+
+  validate_workspace_limit
 
   (
     flock -n 9 || exit 0

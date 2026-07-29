@@ -12,8 +12,8 @@ machine.
 4. Inspect the target machine's live configuration and user-owned plugins.
 5. Update module instructions or snippets only when the current official
    contract is understood.
-6. Run the module's static checks and, on a test system, its documented runtime
-   validation.
+6. Run `scripts/check`, then run the affected module's documented runtime
+   validation on a test system.
 7. Update `docs/compatibility.md` with the tested version, review date, and
    actual contracts checked.
 
@@ -37,7 +37,7 @@ The default and compatibility branch is `quattro`. Before pushing:
 
 ```bash
 git status --short
-git diff --check
+scripts/check
 ```
 
 Review the complete diff for private paths, authentication data, hostnames,

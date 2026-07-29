@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$REPO_ROOT"
+
+required_commands=(
+  bats
+  file
+  fish
+  git
+  jq
+  omarchy
+  qmllint
+  rg
+  shellcheck
+  shfmt
+  starship
+  stylua
+)
+
+missing_commands=()
+for command_name in "${required_commands[@]}"; do
+  command -v "$command_name" >/dev/null 2>&1 || missing_commands+=("$command_name")
+done
+
+if ((${#missing_commands[@]})); then
+  printf 'Missing validation command(s): %s\n' "${missing_commands[*]}" >&2
+  exit 1
+fi
+
+shell_files=()
+while IFS= read -r -d '' candidate; do
+  if head -n 1 "$candidate" | grep -qE '^#!.*(ba)?sh([[:space:]]|$)'; then
+    shell_files+=("$candidate")
+  fi
+done < <(find modules scripts tests/helpers -type f -print0)
+
+mapfile -d '' -t lua_files < <(find modules -type f -name '*.lua' -print0)
+
+printf '%s\n' 'Check shell scripts'
+shellcheck "${shell_files[@]}"
+shfmt -d -i 2 -ci "${shell_files[@]}"
+
+printf '%s\n' 'Check Lua snippets'
+stylua --check "${lua_files[@]}"
+
+printf '%s\n' 'Check Fish configuration'
+fish --no-execute modules/terminal/files/.config/fish/config.fish
+
+printf '%s\n' 'Check structured configuration'
+jq -e . modules/proton-vpn/files/.config/omarchy/plugins/local.proton-vpn/manifest.json >/dev/null
+STARSHIP_CONFIG=modules/terminal/files/.config/starship.toml starship explain >/dev/null
+file modules/terminal/files/.config/roamarchy/terminal/tux.gif |
+  grep -q 'GIF image data'
+
+printf '%s\n' 'Check Omarchy shell plugin'
+omarchy plugin validate \
+  modules/proton-vpn/files/.config/omarchy/plugins/local.proton-vpn
+qmllint -I "${OMARCHY_PATH:-/usr/share/omarchy}/shell" \
+  modules/proton-vpn/files/.config/omarchy/plugins/local.proton-vpn/Widget.qml
+
+printf '%s\n' 'Check monitor-layout behavior'
+bats tests/monitor-layout.bats
+
+printf '%s\n' 'Check repository contracts'
+required_headings=(
+  '## Behavior'
+  '## Official sources to review'
+  '## Validate'
+  '## Roll back'
+  '## Update-sensitive assumptions'
+)
+
+for readme in modules/*/README.md; do
+  for heading in "${required_headings[@]}"; do
+    if ! grep -Fqx "$heading" "$readme"; then
+      printf '%s: missing required heading %s\n' "$readme" "$heading" >&2
+      exit 1
+    fi
+  done
+done
+
+baseline_hash=$(
+  sed -nE \
+    's/.*Last tested package version.*g([[:xdigit:]]{7})-.*/\1/p' \
+    docs/compatibility.md
+)
+ci_hash=$(
+  sed -nE \
+    's/^[[:space:]]+ref: ([[:xdigit:]]{40})$/\1/p' \
+    .github/workflows/validate.yml
+)
+if [[ -z $baseline_hash || -z $ci_hash || ${ci_hash:0:7} != "$baseline_hash" ]]; then
+  printf '%s\n' \
+    'The CI Omarchy commit does not match the documented compatibility baseline' \
+    >&2
+  exit 1
+fi
+
+while IFS= read -r payload; do
+  module_dir=${payload%%/files/*}
+  if [[ $module_dir == "$payload" ]]; then
+    module_dir=${payload%%/snippets/*}
+  fi
+  readme="$module_dir/README.md"
+  basename=${payload##*/}
+
+  if ! grep -Fq "$basename" "$readme"; then
+    printf '%s: payload is not named in %s\n' "$payload" "$readme" >&2
+    exit 1
+  fi
+done < <(find modules -type f \( -path '*/files/*' -o -path '*/snippets/*' \) -print)
+
+if git grep -nE '/home/[[:alnum:]_.-]+/' -- \
+  ':!scripts/check' ':!*.gif'; then
+  printf '%s\n' 'Tracked files contain a user-specific home path' >&2
+  exit 1
+fi
+
+while IFS= read -r tracked_path; do
+  case "$tracked_path" in
+    *.ovpn | *.nmconnection | */backups/* | */cache/* | */history/* | */logs/*)
+      printf 'Forbidden generated or private path is tracked: %s\n' "$tracked_path" >&2
+      exit 1
+      ;;
+  esac
+done < <(git ls-files)
+
+if rg -n '[[:blank:]]+$' . --glob '!.git/**' --glob '!*.gif'; then
+  printf '%s\n' 'Repository files contain trailing whitespace' >&2
+  exit 1
+fi
+
+git diff --check
+printf '%s\n' 'All checks passed'
