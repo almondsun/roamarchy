@@ -10,7 +10,7 @@ out of scope.
 
 > [!IMPORTANT]
 > Omarchy Quattro is an alpha and its interfaces can change. Before applying
-> any module, a person or agent must read the current official documentation,
+> any module, the user must read the current official documentation,
 > inspect the installed Omarchy source relevant to that module, and compare the
 > module with the target machine's existing configuration.
 
