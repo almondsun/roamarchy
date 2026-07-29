@@ -1,0 +1,4 @@
+# Local backups and machine-only VPN exports must not enter version control.
+*.bak
+*.bak.*
+modules/proton-vpn/**/*.conf

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "local.proton-vpn",
+  "name": "Proton VPN",
+  "version": "1.0.0",
+  "author": "Local",
+  "description": "Proton VPN Quick Connect indicator",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "Proton VPN",
+    "description": "Quick Connect status and toggle",
+    "category": "Status",
+    "allowMultiple": false
+  }
+}
