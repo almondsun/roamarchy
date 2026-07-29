@@ -36,10 +36,10 @@ jobs:
           stylua
 
       - name: Check out Roamarchy
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check out tested Omarchy contract
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: basecamp/omarchy
           ref: 9174fbf8515f4c057c91071ec39af731602adb92
@@ -49,5 +49,5 @@ jobs:
         env:
           OMARCHY_PATH: ${{ github.workspace }}/.ci/omarchy
         run: |
-          export PATH="$OMARCHY_PATH/bin:$PATH"
+          export PATH="$OMARCHY_PATH/bin:/usr/lib/qt6/bin:$PATH"
           scripts/check
