@@ -23,6 +23,8 @@ build is compatible. Re-run the maintenance review after each official update.
 | Monitor layout | Quattro monitor watcher, Hyprland Lua API, and IPC output |
 | Power profiles | Public `omarchy powerprofiles` commands and shell ownership |
 | Proton VPN | Omarchy bar-widget manifest, `BarIndicator`, and Proton CLI behavior |
+| Screen recordings | Public `OMARCHY_SCREENRECORD_DIR`, UWSM user environment loading, and OBS VA-API encoder discovery |
+| Screenshots | Public `OMARCHY_SCREENSHOT_DIR` override and UWSM user environment loading |
 | Terminal | Public terminal selection, current theme state, Kitty/Fish integration |
 
 ## Unsupported baselines

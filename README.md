@@ -38,6 +38,8 @@ destination-mapped files, mergeable snippets, and exact manual commands.
 | [Monitor layout](modules/monitor-layout/README.md) | Dynamic laptop/external layout and odd/even workspaces | User script and Hyprland snippets |
 | [Power profiles](modules/power-profiles/README.md) | Quattro-owned AC/battery profile policy | Official Omarchy commands |
 | [Proton VPN](modules/proton-vpn/README.md) | Quick Connect indicator beside official indicators | User-owned shell plugin |
+| [Screen recordings](modules/screen-recordings/README.md) | Save recordings under `~/Videos/recordings` and document low-impact OBS tuning | UWSM environment override and hardware-guided settings |
+| [Screenshots](modules/screenshots/README.md) | Save screenshots under `~/Pictures/screenshots` | UWSM environment override |
 | [Terminal](modules/terminal/README.md) | Kitty, Fish, Starship, and fastfetch profile | Complete files, one snippet, and an asset |
 
 Every module is optional. Hardware-specific identifiers, secrets, auth state,
