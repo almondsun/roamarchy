@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euo pipefail
+
+destination=${XDG_DATA_HOME:-$HOME/.local/share}/roamarchy/gnome-keyring.passphrase
+[[ ! -e $destination && ! -L $destination ]] || {
+  printf 'Passphrase file already exists: %s\n' "$destination" >&2
+  exit 1
+}
+
+read -r -s -p 'New unique keyring passphrase (20+ characters): ' first
+printf '\n'
+read -r -s -p 'Confirm unique keyring passphrase: ' second
+printf '\n'
+
+if [[ $first != "$second" ]]; then
+  printf '%s\n' 'Passphrases do not match.' >&2
+  exit 1
+fi
+if ((${#first} < 20 || ${#first} > 256)); then
+  printf '%s\n' 'Passphrase must contain between 20 and 256 characters.' >&2
+  exit 1
+fi
+
+install -d -m 0700 "${destination%/*}"
+temporary=$(mktemp "${destination%/*}/.gnome-keyring.passphrase.XXXXXX")
+trap 'rm -f -- "$temporary"; unset first second' EXIT
+chmod 0600 "$temporary"
+printf %s "$first" >"$temporary"
+mv -- "$temporary" "$destination"
+trap - EXIT
+unset first second
+printf 'Created %s with mode 0600.\n' "$destination"

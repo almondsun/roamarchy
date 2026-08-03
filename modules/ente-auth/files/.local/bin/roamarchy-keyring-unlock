@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euo pipefail
+
+passphrase_file=${ROAMARCHY_KEYRING_PASSPHRASE_FILE:-${XDG_DATA_HOME:-$HOME/.local/share}/roamarchy/gnome-keyring.passphrase}
+daemon_bin=${ROAMARCHY_GNOME_KEYRING_DAEMON:-/usr/bin/gnome-keyring-daemon}
+
+fail() {
+  printf 'roamarchy-keyring-unlock: %s\n' "$1" >&2
+  exit 1
+}
+
+[[ -f $passphrase_file && ! -L $passphrase_file ]] ||
+  fail "passphrase must be a regular, non-symlink file"
+[[ $(stat -c %u -- "$passphrase_file") == "$EUID" ]] ||
+  fail "passphrase must be owned by the current user"
+[[ $(stat -c %a -- "$passphrase_file") == 600 ]] ||
+  fail "passphrase must have mode 0600"
+
+passphrase_size=$(stat -c %s -- "$passphrase_file")
+((passphrase_size >= 20 && passphrase_size <= 256)) ||
+  fail "passphrase must contain between 20 and 256 bytes"
+[[ $(wc -l <"$passphrase_file") == 0 ]] ||
+  fail "passphrase must not contain newline characters"
+[[ -x $daemon_bin ]] || fail "GNOME Keyring daemon is not executable"
+
+export GNOME_KEYRING_CONTROL=${GNOME_KEYRING_CONTROL:-${XDG_RUNTIME_DIR:?}/keyring}
+exec "$daemon_bin" \
+  --login \
+  --foreground \
+  --control-directory="$GNOME_KEYRING_CONTROL" \
+  <"$passphrase_file"

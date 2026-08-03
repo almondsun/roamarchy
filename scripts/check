@@ -81,6 +81,9 @@ trap - EXIT
 printf '%s\n' 'Check monitor-layout behavior'
 bats tests/monitor-layout.bats
 
+printf '%s\n' 'Check keyring tools behavior'
+bats tests/keyring-tools.bats
+
 printf '%s\n' 'Check repository contracts'
 required_headings=(
   '## Behavior'

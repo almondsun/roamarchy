@@ -18,7 +18,8 @@ build is compatible. Re-run the maintenance review after each official update.
 
 | Module | Upstream contract checked |
 | --- | --- |
-| Appearance | Quattro Hyprland environment overrides and current cursor behavior |
+| Appearance | Quattro Hyprland/UWSM cursor propagation, XCursor fallback behavior, and SDDM cursor settings |
+| Ente Auth | Quattro passwordless keyring template, SDDM autologin, GNOME Keyring 50 stdin unlock, and Ente Auth libsecret storage |
 | Keyboard | Quattro Lua input/binding helpers and current default keybindings |
 | Monitor layout | Quattro monitor watcher, Hyprland Lua API, and IPC output |
 | Power profiles | Public `omarchy powerprofiles` commands and shell ownership |

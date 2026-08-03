@@ -33,7 +33,8 @@ destination-mapped files, mergeable snippets, and exact manual commands.
 
 | Module | Result | Delivery |
 | --- | --- | --- |
-| [Appearance](modules/appearance/README.md) | Bibata cursor policy | Hyprland snippet |
+| [Appearance](modules/appearance/README.md) | Bibata cursor across the desktop, Steam, and login | Hyprland snippet, XCursor fallback, and SDDM drop-in |
+| [Ente Auth](modules/ente-auth/README.md) | Encrypted keyring with one-password boot and Ente-compatible storage | User helpers and systemd service |
 | [Keyboard](modules/keyboard/README.md) | Latin American layout, normal CapsLock, screenshot binding | Hyprland snippets |
 | [Monitor layout](modules/monitor-layout/README.md) | Dynamic laptop/external layout and odd/even workspaces | User script and Hyprland snippets |
 | [Power profiles](modules/power-profiles/README.md) | Quattro-owned AC/battery profile policy | Official Omarchy commands |

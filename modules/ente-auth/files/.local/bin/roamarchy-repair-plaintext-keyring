@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import tempfile
+
+ITEM_SECRET = re.compile(
+    r"(?ms)(^\[(?P<section>\d+)\]\n(?:(?!^\[).)*?^secret=)"
+    r"(?P<secret>.*?)(\nmtime=)"
+)
+
+def fail(message: str) -> "None":
+    raise SystemExit(message)
+
+def check_regular_private(path: Path, description: str) -> os.stat_result:
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        fail(f"{description} does not exist: {path}")
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        fail(f"{description} must be a regular, non-symlink file: {path}")
+    if metadata.st_uid != os.getuid():
+        fail(f"{description} is not owned by the current user: {path}")
+    if stat.S_IMODE(metadata.st_mode) & 0o077:
+        fail(f"{description} must not be accessible by group or other users: {path}")
+    return metadata
+
+def repair(source: Path, backup: Path) -> int:
+    metadata = check_regular_private(source, "keyring")
+    original = source.read_text(encoding="utf-8")
+    repaired_count = 0
+
+    def escape_multiline(match: re.Match[str]) -> str:
+        nonlocal repaired_count
+        secret = match.group("secret")
+        if "\n" not in secret:
+            return match.group(0)
+        escaped = (
+            secret.replace("\\", "\\\\")
+            .replace("\t", "\\t")
+            .replace("\r", "\\r")
+            .replace("\n", "\\n")
+        )
+        repaired_count += 1
+        return f"{match.group(1)}{escaped}{match.group(4)}"
+
+    repaired = ITEM_SECRET.sub(escape_multiline, original)
+    if repaired_count == 0:
+        print("repaired_multiline_secrets=0")
+        return 0
+
+    if backup.exists() or backup.is_symlink():
+        fail(f"backup destination already exists: {backup}")
+    parent_metadata = backup.parent.lstat()
+    if not stat.S_ISDIR(parent_metadata.st_mode) or stat.S_ISLNK(parent_metadata.st_mode):
+        fail(f"backup parent must be a real directory: {backup.parent}")
+    if parent_metadata.st_uid != os.getuid() or stat.S_IMODE(parent_metadata.st_mode) & 0o077:
+        fail(f"backup parent must be private and owned by the current user: {backup.parent}")
+
+    shutil.copy2(source, backup, follow_symlinks=False)
+    backup.chmod(0o600)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=source.parent,
+            prefix=f".{source.name}.repair.", delete=False,
+        ) as output:
+            temporary_path = Path(output.name)
+            os.fchmod(output.fileno(), 0o600)
+            output.write(repaired)
+            output.flush()
+            os.fsync(output.fileno())
+        os.chown(temporary_path, metadata.st_uid, metadata.st_gid)
+        os.replace(temporary_path, source)
+        directory_fd = os.open(source.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
+
+    print(f"repaired_multiline_secrets={repaired_count}")
+    return 0
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Escape secrets that GNOME Keyring wrote across plaintext lines."
+    )
+    parser.add_argument("keyring", type=Path)
+    parser.add_argument("--backup", type=Path, required=True)
+    arguments = parser.parse_args()
+    return repair(arguments.keyring, arguments.backup)
+
+if __name__ == "__main__":
+    raise SystemExit(main())
