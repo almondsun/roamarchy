@@ -1,7 +1,7 @@
 # Roamarchy
 
-Roamarchy is an opinionated, documentation-first configuration profile for the
-official **Omarchy Quattro alpha**. It keeps portable desktop customizations
+Roamarchy is an opinionated, documentation-first configuration profile for
+**Omarchy 4 (Quattro)**. It keeps portable desktop customizations
 reviewable and makes them straightforward to reproduce across compatible
 Omarchy systems without treating a home directory as a backup.
 
@@ -9,10 +9,11 @@ The default branch is `quattro`. Pre-Quattro configurations are intentionally
 out of scope.
 
 > [!IMPORTANT]
-> Omarchy Quattro is an alpha and its interfaces can change. Before applying
-> any module, the user must read the current official documentation,
-> inspect the installed Omarchy source relevant to that module, and compare the
-> module with the target machine's existing configuration.
+> Omarchy 4 is released, but Roamarchy is currently validated against the
+> rolling Edge channel, whose interfaces can change. Before applying any
+> module, the user must read the current official documentation, inspect the
+> installed Omarchy source relevant to that module, and compare the module with
+> the target machine's existing configuration.
 
 ## Start here
 

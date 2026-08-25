@@ -17,7 +17,7 @@ timeouts so the UI cannot remain busy indefinitely.
 Before applying this module, check:
 
 - `omarchy version`
-- `omarchy plugin --help` and `omarchy bar plugin --help`
+- `omarchy plugin --help` and `omarchy bar --help`
 - `/usr/share/omarchy/shell/Ui/BarIndicator.qml`
 - `/usr/share/omarchy/shell/plugins/bar/widgets/Indicators.qml`
 - `/usr/share/omarchy/shell/plugins/bar/widgets/Indicators.manifest.json`
@@ -55,13 +55,18 @@ install -D -m 0644 \
 install -D -m 0644 \
   modules/proton-vpn/files/.config/omarchy/plugins/local.proton-vpn/manifest.json \
   "$HOME/.config/omarchy/plugins/local.proton-vpn/manifest.json"
-omarchy plugin rescan
-omarchy bar plugin add local.proton-vpn --after omarchy.indicators
-omarchy restart shell
+omarchy-shell shell rescanPlugins
+for attempt in {1..40}; do
+  omarchy plugin list --json |
+    jq -e 'any(.[]; .id == "local.proton-vpn")' >/dev/null && break
+  sleep 0.05
+done
+omarchy plugin enable local.proton-vpn --after omarchy.indicators
 ```
 
 `omarchy refresh shell` resets the complete bar layout. After an intentional
-refresh, inspect the new official defaults, rescan the plugin, and add it again.
+refresh, inspect the new official defaults and enable the plugin again with the
+placement shown above.
 
 ## Validate
 
@@ -82,14 +87,17 @@ operation must leave the busy state within 30 seconds.
 ## Roll back
 
 ```bash
-omarchy bar plugin remove local.proton-vpn
-omarchy plugin rescan
-omarchy restart shell
+omarchy plugin disable local.proton-vpn
 ```
 
 Move the installed plugin directory out of `~/.config/omarchy/plugins/`, or
 restore its backup if it existed before Roamarchy. Restore the backed-up
 `shell.json` only if the layout command changed more than the Proton entry.
+Then refresh plugin discovery:
+
+```bash
+omarchy-shell shell rescanPlugins
+```
 
 ## Update-sensitive assumptions
 

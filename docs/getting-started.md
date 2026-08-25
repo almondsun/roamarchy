@@ -1,8 +1,9 @@
 # Getting Started
 
 Roamarchy is applied module by module. It does not include an installer because
-Quattro is an alpha and a future official update may change the configuration
-contract a module relies on.
+its Edge-tested Omarchy 4 interfaces can change between rolling updates. A
+future official update may therefore change the configuration contract a
+module relies on.
 
 ## 1. Clone the Quattro profile
 

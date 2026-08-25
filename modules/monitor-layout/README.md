@@ -19,7 +19,7 @@ Connector names and detected modes remain machine-local runtime state.
 Before applying this module, check:
 
 - `omarchy version`
-- `/usr/share/omarchy/default/hypr/monitors.lua`
+- `/usr/share/omarchy/config/hypr/monitors.lua`
 - `/usr/share/omarchy/default/hypr/autostart.lua`
 - `/usr/share/omarchy/bin/omarchy-hyprland-monitor-watch`
 - current Hyprland monitor, workspace-rule, dispatch, and IPC documentation

@@ -46,7 +46,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: basecamp/omarchy
-          ref: 9174fbf8515f4c057c91071ec39af731602adb92
+          ref: 93010924047d09f62f702bf8b5c07d0149c11943
           path: .ci/omarchy
 
       - name: Validate repository

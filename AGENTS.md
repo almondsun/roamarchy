@@ -2,10 +2,10 @@
 
 ## Purpose
 
-Roamarchy is a documentation-first, opt-in configuration profile for the
-official Omarchy Quattro alpha. Preserve portability and current upstream
-behavior; do not turn this repository into a raw home-directory backup or an
-automatic installer.
+Roamarchy is a documentation-first, opt-in configuration profile for Omarchy 4
+(Quattro), currently validated against the rolling Edge channel. Preserve
+portability and current upstream behavior; do not turn this repository into a
+raw home-directory backup or an automatic installer.
 
 ## Mandatory preflight
 

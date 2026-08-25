@@ -78,6 +78,35 @@ fi
 rm -rf "$qml_import_root"
 trap - EXIT
 
+printf '%s\n' 'Check documented Omarchy command contracts'
+require_help_text() {
+  local help_output=$1 expected=$2
+  if ! grep -Fq "$expected" <<<"$help_output"; then
+    printf 'Current Omarchy help is missing documented command: %s\n' "$expected" >&2
+    exit 1
+  fi
+}
+
+plugin_help=$(omarchy plugin --help)
+require_help_text "$plugin_help" 'omarchy plugin enable'
+require_help_text "$plugin_help" 'omarchy plugin disable'
+require_help_text "$plugin_help" 'omarchy plugin validate'
+
+bar_help=$(omarchy bar --help)
+require_help_text "$bar_help" 'put <id>'
+require_help_text "$bar_help" 'move <id>'
+
+capture_help=$(omarchy capture --help)
+require_help_text "$capture_help" 'omarchy capture screenshot'
+require_help_text "$capture_help" 'omarchy capture screenrecording'
+
+powerprofiles_help=$(omarchy powerprofiles --help)
+require_help_text "$powerprofiles_help" 'omarchy powerprofiles list'
+require_help_text "$powerprofiles_help" 'omarchy powerprofiles set'
+
+terminal_help=$(omarchy install terminal --help)
+require_help_text "$terminal_help" 'omarchy install terminal'
+
 printf '%s\n' 'Check monitor-layout behavior'
 bats tests/monitor-layout.bats
 
@@ -101,6 +130,20 @@ for readme in modules/*/README.md; do
     fi
   done
 done
+
+omarchy_contract_root=${OMARCHY_PATH:-/usr/share/omarchy}
+while IFS= read -r documented_path; do
+  relative_path=${documented_path#/usr/share/omarchy/}
+  if [[ ! -e $omarchy_contract_root/$relative_path ]]; then
+    printf 'Documented Omarchy source does not exist: %s\n' "$documented_path" >&2
+    exit 1
+  fi
+done < <(
+  rg -No --no-filename \
+    '/usr/share/omarchy/[[:alnum:]_./-]*' \
+    README.md AGENTS.md docs modules |
+    sort -u
+)
 
 baseline_hash=$(
   sed -nE \
